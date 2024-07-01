@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -100,5 +101,27 @@ public class ImageController {
         Member member = customUserDetails.getMember();
         List<ImageDto> uploadedImages = imageService.saveImages(files, regionUniqueId, member);
         return ResponseEntity.ok(uploadedImages);
+    }
+
+    @PostMapping("/images/delete")
+    public ResponseEntity<Map<String, String>> deleteImages(@RequestBody Map<String, List<Long>> request,
+                                                            @AuthenticationPrincipal CustomUserDetails customUserDetails) throws IOException {
+        List<Long> imageIds = request.get("imageIds");
+        Member member = customUserDetails.getMember();
+
+        System.out.println("Request received to delete images: " + imageIds);
+
+        if (imageIds != null && !imageIds.isEmpty()) {
+            imageService.deleteImages(imageIds, member);
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Images deleted successfully");
+            return ResponseEntity.ok(response);
+        } else {
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "No image IDs provided");
+            return ResponseEntity.badRequest().body(response);
+        }
     }
 }

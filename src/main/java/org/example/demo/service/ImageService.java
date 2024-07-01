@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.*;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -27,10 +26,6 @@ public class ImageService {
 
     public ImageService(ImageRepository imageRepository) {
         this.imageRepository = imageRepository;
-    }
-
-    public List<Image> findImagesByMember(Member member) {
-        return imageRepository.findByMember(member);
     }
 
     public List<Image> findImagesByRegionAndMember(String regionUniqueId, Member member) {
@@ -84,7 +79,7 @@ public class ImageService {
                 image.setRegionUniqueId(regionUniqueId);
                 image.setImageUrl("/uploads/" + member.getId() + "/" + fileName); // 상대 경로로 저장
                 image.setUploadedAt(new Timestamp(System.currentTimeMillis()));
-//                image.setIsPrimary(false);
+                image.setIsPrimary(false);
                 imageRepository.save(image);
 
                 // DTO로 변환하여 리스트에 추가
@@ -100,6 +95,22 @@ public class ImageService {
             }
         }
         return uploadedImages;
+    }
+
+    public void deleteImages(List<Long> imageIds, Member member) throws IOException {
+        for (Long imageId : imageIds) {
+            Image image = imageRepository.findById(imageId).orElse(null);
+            // 파일 경로 생성
+//            Path filePath = Paths.get(uploadDir + "/" + member.getId(), image.getImageUrl());
+//            Path filePath = Paths.get(image.getImageUrl());
+            Path filePath = Paths.get(image.getImageUrl().substring(1));
+            System.out.println("Path: " + filePath);
+            // 파일 삭제
+            Files.delete(filePath);
+            // DB에서 이미지 삭제
+            imageRepository.delete(image);
+        }
+
     }
 
 
