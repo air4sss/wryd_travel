@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Globe</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.87/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.87/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html, body, #cesiumContainer {
+            width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+        }
+        #resetButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid black;
+            cursor: pointer;
+        }
+        #infoBox {
+            display: none;
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            width: 300px;
+            background-color: white;
+            border: 1px solid black;
+            padding: 10px;
+            z-index: 100;
+        }
+        #infoBox img {
+            width: 100%;
+            height: auto;
+        }
+        #infoBox .closeButton {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            cursor: pointer;
+        }
+        #infoBox input[type="file"] {
+            display: none;
+        }
+        #infoBox #imageGallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        #infoBox #imageGallery img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            cursor: pointer;
+        }
+        #infoBox #imageGallery .selected {
+            border: 2px solid red;
+        }
+        .cesium-credit-logo {
+            display: none !important;
+        }
+        .cesium-credit-textContainer {
+            display: none !important;
+        }
+        .cesium-widget-credits {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+<div id="resetButton">다른 나라 선택하기</div>
+<div id="infoBox">
+    <span class="closeButton">X</span>
+    <img id="infoImage" src="" alt="Country Image">
+    <h2 id="infoTitle"></h2>
+    <h3 id="infoSubtitle"></h3>
+    <p id="infoDescription"></p>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <button id="addImageButton">사진 추가</button>
+    <button id="deleteImageButton">사진 삭제</button>
+    <div id="imageGallery"></div>
+</div>
+<div id="cesiumContainer"></div>
+<script>
+    var viewer = new Cesium.Viewer('cesiumContainer', {
+        imageryProvider: false,
+        baseLayerPicker: false,
+        sceneMode: Cesium.SceneMode.SCENE3D,
+        animation: false,
+        timeline: false,
+        fullscreenButton: false,
+        homeButton: false,
+        infoBox: false,
+        navigationHelpButton: false,
+        sceneModePicker: false,
+        geocoder: false,
+        creditContainer: null
+    });
+
+    viewer.scene.globe.baseColor = Cesium.Color.SKYBLUE;
+
+    var userLocation = {
+        latitude: 37.5665,
+        longitude: 126.9780,
+        height: 3000000
+    };
+
+    var isDetailedView = false;
+    var countriesDataSource;
+    var labelEntities = [];
+    var detailHandler;
+    var currentRegionProperties;
+    var regionImages = {}; // 각 지역마다 이미지 저장소
+    var isDeleteMode = false;
+
+    viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(userLocation.longitude, userLocation.latitude, userLocation.height)
+    });
+
+    loadCountries();
+
+    function loadCountries() {
+        countriesDataSource = new Cesium.GeoJsonDataSource();
+        countriesDataSource.load('json/country.geojson').then(function() {
+            viewer.dataSources.add(countriesDataSource);
+            var entities = countriesDataSource.entities.values;
+
+            // 미리 정의된 국가 중심 위치 및 국기 이미지
+            var countryInfo = {
+                "North Korea": {longitude: 127.5101, latitude: 40.3399},
+                "South Korea": {longitude: 127.7669, latitude: 35.9078},
+                "Japan": {longitude: 138.2529, latitude: 36.2048},
+                "China": {longitude: 104.1954, latitude: 35.8617}
+            };
+
+            for (var i = 0; i < entities.length; i++) {
+                var entity = entities[i];
+                entity.name = entity.properties.name;
+                entity.polygon.material = Cesium.Color.GREEN.withAlpha(0.8);
+            }
+
+            // 국가 이름 라벨 추가
+            for (var countryName in countryInfo) {
+                if (countryInfo.hasOwnProperty(countryName)) {
+                    var center = countryInfo[countryName];
+                    var labelEntity = viewer.entities.add({
+                        position: Cesium.Cartesian3.fromDegrees(center.longitude, center.latitude),
+                        label: {
+                            text: countryName,
+                            font: '12pt "맑은 고딕", "Malgun Gothic", sans-serif',
+                            fillColor: Cesium.Color.BLACK,
+                            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                            outlineWidth: 1,
+                            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                        }
+                    });
+                    labelEntities.push({name: countryName.toLowerCase(), entity: labelEntity});
+                }
+            }
+        });
+    }
+
+    var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    handler.setInputAction(function(click) {
+        if (isDetailedView) return;
+        var pickedObject = viewer.scene.pick(click.position);
+        if (Cesium.defined(pickedObject) && pickedObject.id) {
+            var countryName = pickedObject.id.name;
+            if (countryName && typeof countryName === 'string') countryName = countryName.trim().toLowerCase();
+            else countryName = countryName.toString().trim().toLowerCase();
+            console.log("countryName is " + countryName);
+
+            // 라벨 숨기기
+            labelEntities.forEach(function(label) {
+                if (label.name === countryName) {
+                    label.entity.show = false;
+                }
+            });
+
+            loadRegions(countriesDataSource, countryName);
+            showInfoBox(countryName);
+            isDetailedView = true;
+        }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    function hideRegions(dataSource, countryName) {
+        console.log("start hide");
+
+        var entities = dataSource.entities.values;
+        for (var i = 0; i < entities.length; i++) {
+            var entity = entities[i];
+            if (entity.name.toString().trim().toLowerCase() === countryName) {
+                console.log("try hide");
+                entity.show = false;
+            }
+        }
+    }
+
+    function loadRegions(dataSource, countryName) {
+        var countryNameToLoad = getCountryName(countryName);
+        var RegionsDataSource = new Cesium.GeoJsonDataSource();
+        RegionsDataSource.load(`json/countries/${countryNameToLoad}.geojson`).then(function() {
+            viewer.dataSources.add(RegionsDataSource);
+            var entities = RegionsDataSource.entities.values;
+
+            for (var i = 0; i < entities.length; i++) {
+                var entity = entities[i];
+                entity.polygon.material = Cesium.Color.WHITE;
+                entity.polygon.outline = true;
+                entity.polygon.outlineColor = Cesium.Color.BLACK;
+                entity.polygon.outlineWidth = 1;
+                entity.name = entity.properties.adm_nm; // Change to appropriate property
+            }
+            var cameraPosition = {
+                "South_Korea": {longitude: 127.7669, latitude: 35.9078, height: 1000000},
+                "North_Korea": {longitude: 127.5101, latitude: 40.3399, height: 1000000},
+                "Japan": {longitude: 138.2529, latitude: 36.2048, height: 1000000},
+                "China": {longitude: 104.1954, latitude: 35.8617, height: 1000000}
+            };
+            try {
+                hideRegions(dataSource, countryName);
+                if (cameraPosition[countryNameToLoad]) {
+                    viewer.camera.flyTo({
+                        destination: Cesium.Cartesian3.fromDegrees(cameraPosition[countryNameToLoad].longitude, cameraPosition[countryNameToLoad].latitude, cameraPosition[countryNameToLoad].height)
+                    });
+                }
+
+                // Add detailed click handler for the new data source
+                if (detailHandler) {
+                    detailHandler.destroy();
+                }
+                detailHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+                detailHandler.setInputAction(function(click) {
+                    console.log("detail clicked");
+                    var pickedObject = viewer.scene.pick(click.position);
+                    console.log(pickedObject);
+                    if (Cesium.defined(pickedObject) && pickedObject.id) {
+                        var region = pickedObject.id;
+                        currentRegionProperties = region.properties;
+                        showDetailInfoBox(region.properties);
+                    }
+                }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+            } catch (e) {
+                console.log("지원하지 않는 나라");
+            }
+
+        });
+    }
+
+    function getCountryName(countryName) {
+        if (countryName === 'south korea') return "South_Korea";
+        if (countryName === 'north korea') return "North_Korea";
+        if (countryName === 'japan') return "Japan";
+        if (countryName === 'china') return "China";
+    }
+
+    function showInfoBox(countryName) {
+        var infoBox = document.getElementById('infoBox');
+        var infoImage = document.getElementById('infoImage');
+        var infoTitle = document.getElementById('infoTitle');
+        var infoSubtitle = document.getElementById('infoSubtitle');
+        var infoDescription = document.getElementById('infoDescription');
+        var fileInput = document.getElementById('fileInput');
+        var addImageButton = document.getElementById('addImageButton');
+        var deleteImageButton = document.getElementById('deleteImageButton');
+        var imageGallery = document.getElementById('imageGallery');
+
+        // Hide file input, add and delete buttons, and image gallery
+        fileInput.style.display = 'none';
+        addImageButton.style.display = 'none';
+        deleteImageButton.style.display = 'none';
+        imageGallery.style.display = 'none';
+
+        var countryDetails = {
+            "south korea": {
+                image: 'img/countries/South_Korea.png',
+                title: 'South Korea',
+                subtitle: 'The Land of the Morning Calm',
+                description: 'South Korea is a country in East Asia, constituting the southern part of the Korean Peninsula and sharing a land border with North Korea.'
+            },
+            "north korea": {
+                image: 'image/north_korea.png',
+                title: 'North Korea',
+                subtitle: 'The Hermit Kingdom',
+                description: 'North Korea, officially the Democratic People\'s Republic of Korea, is a country in East Asia constituting the northern part of the Korean Peninsula.'
+            },
+            "japan": {
+                image: 'image/japan.png',
+                title: 'Japan',
+                subtitle: 'Land of the Rising Sun',
+                description: 'Japan is an island country in East Asia, located in the northwest Pacific Ocean and bordered on the west by the Sea of Japan.'
+            },
+            "china": {
+                image: 'image/china.png',
+                title: 'China',
+                subtitle: 'The Red Dragon',
+                description: 'China, officially the People\'s Republic of China, is a country in East Asia. It is the world\'s most populous country, with a population of more than 1.4 billion.'
+            }
+        };
+
+        var details = countryDetails[countryName];
+        if (details) {
+            infoImage.src = details.image;
+            infoTitle.textContent = details.title;
+            infoSubtitle.textContent = details.subtitle;
+            infoDescription.textContent = details.description;
+            infoBox.style.display = 'block';
+        }
+    }
+
+    function showDetailInfoBox(properties) {
+        var infoBox = document.getElementById('infoBox');
+        var infoImage = document.getElementById('infoImage');
+        var infoTitle = document.getElementById('infoTitle');
+        var infoSubtitle = document.getElementById('infoSubtitle');
+        var infoDescription = document.getElementById('infoDescription');
+        var imageGallery = document.getElementById('imageGallery');
+
+        addImageButton.style.display = 'block';
+        deleteImageButton.style.display = 'block';
+        imageGallery.style.display = 'block';
+
+        // 상세 정보 표시
+        infoImage.src = ''; // 필요시 지역 이미지를 추가
+        infoTitle.textContent = properties.adm_nm;
+        infoSubtitle.textContent = properties.adm_cd;
+        infoDescription.textContent = 'Sido: ' + properties.sidonm + '\nSgg: ' + properties.sggnm;
+
+        // 이미지 갤러리 초기화 및 지역별 이미지 로드
+        imageGallery.innerHTML = '';
+        var regionKey = properties.adm_cd;
+        if (regionImages[regionKey]) {
+            regionImages[regionKey].forEach(function(imageSrc) {
+                var img = document.createElement('img');
+                img.src = imageSrc;
+                img.addEventListener('click', function() {
+                    if (isDeleteMode) {
+                        img.classList.toggle('selected');
+                    } else {
+                        infoImage.src = imageSrc;
+                        // 지도에 이미지 반영
+                        var region = getRegionEntity(regionKey);
+                        if (region) {
+                            region.polygon.material = new Cesium.ImageMaterialProperty({
+                                image: imageSrc,
+                                transparent: true
+                            });
+                        }
+                    }
+                });
+                imageGallery.appendChild(img);
+            });
+        }
+
+        infoBox.style.display = 'block';
+    }
+
+    function getRegionEntity(regionKey) {
+        var entities = viewer.dataSources._dataSources[1].entities.values;
+        for (var i = 0; i < entities.length; i++) {
+            if (entities[i].properties.adm_cd === regionKey) {
+                return entities[i];
+            }
+        }
+        return null;
+    }
+
+    document.getElementById('resetButton').addEventListener('click', function() {
+        viewer.dataSources.removeAll();
+        loadCountries();
+        labelEntities.forEach(function(label) {
+            label.entity.show = true;
+        });
+        isDetailedView = false;
+        if (detailHandler) {
+            detailHandler.destroy();
+            detailHandler = null;
+        }
+        document.getElementById('infoBox').style.display = 'none';
+    });
+
+    document.querySelector('#infoBox .closeButton').addEventListener('click', function() {
+        document.getElementById('infoBox').style.display = 'none';
+    });
+
+    // 사진 추가 버튼 클릭 시 파일 선택 창 열기
+    document.getElementById('addImageButton').addEventListener('click', function() {
+        document.getElementById('fileInput').click();
+    });
+
+    // 사진 삭제 버튼 클릭 시 선택 모드 토글
+    document.getElementById('deleteImageButton').addEventListener('click', function() {
+        isDeleteMode = !isDeleteMode;
+        this.textContent = isDeleteMode ? '선택 삭제' : '사진 삭제';
+
+        if (!isDeleteMode) {
+            var selectedImages = document.querySelectorAll('#imageGallery .selected');
+            var regionKey = currentRegionProperties.adm_cd;
+            selectedImages.forEach(function(img) {
+                var index = regionImages[regionKey].indexOf(img.src);
+                if (index > -1) {
+                    regionImages[regionKey].splice(index, 1);
+                }
+                img.remove();
+            });
+        }
+    });
+
+    // 이미지 업로드 및 미리보기 기능 추가
+    document.getElementById('fileInput').addEventListener('change', function(event) {
+        var files = event.target.files;
+        var imageGallery = document.getElementById('imageGallery');
+        var regionKey = currentRegionProperties.adm_cd;
+
+        if (!regionImages[regionKey]) {
+            regionImages[regionKey] = [];
+        }
+
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = document.createElement('img');
+                var imageSrc = e.target.result;
+                img.src = imageSrc;
+                img.addEventListener('click', function() {
+                    if (isDeleteMode) {
+                        img.classList.toggle('selected');
+                    } else {
+                        infoImage.src = imageSrc;
+                        // 지도에 이미지 반영
+                        var region = getRegionEntity(regionKey);
+                        if (region) {
+                            region.polygon.material = new Cesium.ImageMaterialProperty({
+                                image: imageSrc,
+                                transparent: true
+                            });
+                        }
+                    }
+                });
+                imageGallery.appendChild(img);
+                regionImages[regionKey].push(imageSrc);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+</body>
+</html>
+```
