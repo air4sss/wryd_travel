@@ -15,13 +15,16 @@
     <h2 id="infoTitle"></h2>
     <h3 id="infoSubtitle"></h3>
     <p id="infoDescription"></p>
-    <input type="file" id="fileInput" accept="image/*" multiple>
-    <button id="addImageButton">사진 추가</button>
-    <button id="deleteImageButton">사진 삭제</button>
+    <div class="button_list" style="display: flex">
+        <button id="addImageButton" class="button">사진 추가</button>
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        <button id="deleteImageButton" class="button simple">사진 삭제</button>
+    </div>
     <div id="imageGallery"></div>
 </div>
 <div id="cesiumContainer"></div>
 <script>
+
     function addImage() {
         fetch('/api/images/primary')
             .then(response => response.json())
@@ -31,7 +34,7 @@
                 });
             })
             .catch(error => {
-                console.error("Error loading primary images:", error);
+                console.error("대표 사진 로드 실패 ", error);
             });
     }
     function addImageToMap(image) {
@@ -41,7 +44,7 @@
                 image: image.imageUrl,
                 transparent: true
             });
-        } else console.error("Region entity not found for region ID:", image.regionUniqueId);
+        } else console.error("지역 코드가 유효하지 않습니다. 지역코드 :", image.regionUniqueId);
 
     }
 
@@ -62,6 +65,7 @@
 
     viewer.scene.globe.baseColor = Cesium.Color.SKYBLUE;
 
+    // 처음 지도 카메라 위치
     var userLocation = {
         latitude: 37.5665,
         longitude: 126.9780,
@@ -143,6 +147,7 @@
         }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
+    // 세부 지역을 보기 위해 세계 지도에서 선택한 부분을 지움
     function hideRegions(dataSource, countryName) {
         var entities = dataSource.entities.values;
         for (var i = 0; i < entities.length; i++) {
@@ -151,6 +156,7 @@
         }
     }
 
+    // 나라 클릭 시 세부 지역 로드
     function loadRegions(dataSource, countryName) {
         var countryNameToLoad = getCountryName(countryName);
         var RegionsDataSource = new Cesium.GeoJsonDataSource();
@@ -160,12 +166,13 @@
 
             for (var i = 0; i < entities.length; i++) {
                 var entity = entities[i];
-                entity.polygon.material = Cesium.Color.WHITE;
+                entity.polygon.material = Cesium.Color.GREEN.withAlpha(0.8);
                 entity.polygon.outline = true;
-                entity.polygon.outlineColor = Cesium.Color.BLACK;
+                entity.polygon.outlineColor = Cesium.Color.GRAY.withAlpha(0.8);
                 entity.polygon.outlineWidth = 1;
                 entity.name = entity.properties.adm_nm; // Change to appropriate property
             }
+
             var cameraPosition = {
                 "South_Korea": {longitude: 127.7669, latitude: 35.9078, height: 1000000},
                 "North_Korea": {longitude: 127.5101, latitude: 40.3399, height: 1000000},
@@ -179,9 +186,8 @@
                         destination: Cesium.Cartesian3.fromDegrees(cameraPosition[countryNameToLoad].longitude, cameraPosition[countryNameToLoad].latitude, cameraPosition[countryNameToLoad].height)
                     });
                 }
-                if (detailHandler) {
-                    detailHandler.destroy();
-                }
+                if (detailHandler) detailHandler.destroy();
+
                 detailHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
                 detailHandler.setInputAction(function(click) {
                     console.log("detail clicked");
@@ -201,7 +207,7 @@
         });
     }
 
-
+    // 나라 이름 변환. 새로운 나라 추가할 때마다 추가
     function getCountryName(countryName) {
         if (countryName === 'south korea') return "South_Korea";
         if (countryName === 'north korea') return "North_Korea";
@@ -215,17 +221,15 @@
         var infoTitle = document.getElementById('infoTitle');
         var infoSubtitle = document.getElementById('infoSubtitle');
         var infoDescription = document.getElementById('infoDescription');
-        var fileInput = document.getElementById('fileInput');
         var addImageButton = document.getElementById('addImageButton');
         var deleteImageButton = document.getElementById('deleteImageButton');
         var imageGallery = document.getElementById('imageGallery');
 
-        // Hide file input, add and delete buttons, and image gallery
-        fileInput.style.display = 'none';
         addImageButton.style.display = 'none';
         deleteImageButton.style.display = 'none';
         imageGallery.style.display = 'none';
 
+        // 각 나라 설명. 나라가 추가될 때마다 추가
         var countryDetails = {
             "south korea": {
                 image: 'img/countries/South_Korea.png',
@@ -269,13 +273,10 @@
         var infoTitle = document.getElementById('infoTitle');
         var infoSubtitle = document.getElementById('infoSubtitle');
         var infoDescription = document.getElementById('infoDescription');
-        var fileInput = document.getElementById('fileInput');
         var addImageButton = document.getElementById('addImageButton');
         var deleteImageButton = document.getElementById('deleteImageButton');
         var imageGallery = document.getElementById('imageGallery');
 
-        // Show file input, add and delete buttons, and image gallery
-        fileInput.style.display = 'block';
         addImageButton.style.display = 'block';
         deleteImageButton.style.display = 'block';
         imageGallery.style.display = 'block';
@@ -286,32 +287,6 @@
         infoSubtitle.textContent = properties.adm_cd;
         infoDescription.textContent = 'Sido: ' + properties.sidonm + '\nSgg: ' + properties.sggnm;
 
-        // 이미지 갤러리 초기화 및 지역별 이미지 로드
-        imageGallery.innerHTML = '';
-        var regionKey = properties.adm_cd;
-        if (regionImages[regionKey]) {
-            regionImages[regionKey].forEach(function(imageSrc) {
-                var img = document.createElement('img');
-                img.src = imageSrc;
-                img.addEventListener('click', function() {
-                    if (isDeleteMode) {
-                        img.classList.toggle('selected');
-                    } else {
-                        infoImage.src = imageSrc;
-                        // 지도에 이미지 반영
-                        var region = getRegionEntity(regionKey);
-                        if (region) {
-                            region.polygon.material = new Cesium.ImageMaterialProperty({
-                                image: imageSrc,
-                                transparent: true
-                            });
-                        }
-                    }
-                });
-                imageGallery.appendChild(img);
-            });
-        }
-
         infoBox.style.display = 'block';
     }
 
@@ -321,7 +296,6 @@
         for (var i = 0; i < entities.length; i++) {
             if (entities[i].properties.adm_cd.toString() === regionKey.toString()) return entities[i];
         }
-        console.error("No entity found for region key:", regionKey); // 디버깅: 찾지 못한 경우
         return null;
     }
 
@@ -333,13 +307,8 @@
                 setPrimaryImageOnMap(images);
                 // Primary image 설정
                 const primaryImage = images.find(image => image.isPrimary);
-                if (primaryImage) {
-                    document.getElementById('infoImage').src = primaryImage.imageUrl;
-                }
+                if (primaryImage) document.getElementById('infoImage').src = primaryImage.imageUrl;
             })
-            .catch(error => {
-                console.error("Error loading region images:", error);
-            });
     }
     function displayImagesInGallery(images) {
         var imageGallery = document.getElementById('imageGallery');
@@ -374,9 +343,7 @@
 
     function setPrimaryImageOnMap(images) {
         images.forEach(image => {
-            if (image.isPrimary) {
-                setMapImage(image);
-            }
+            if (image.isPrimary) setMapImage(image);
         });
     }
 
@@ -387,8 +354,6 @@
                 image: image.imageUrl,
                 transparent: true
             });
-        } else {
-            console.error("Region entity not found for region ID:", image.regionUniqueId);
         }
     }
 
@@ -406,86 +371,64 @@
         document.getElementById('infoBox').style.display = 'none';
     });
 
-    function reset() {
-        viewer.dataSources.removeAll();
-        loadCountries();
-        labelEntities.forEach(function(label) {
-            label.entity.show = true;
-        });
-        isDetailedView = false;
-        if (detailHandler) {
-            detailHandler.destroy();
-            detailHandler = null;
-        }
-        document.getElementById('infoBox').style.display = 'none';
-    }
 
+    // X 버튼 클릭 시 팝업창 사라짐
     document.querySelector('#infoBox .closeButton').addEventListener('click', function() {
         document.getElementById('infoBox').style.display = 'none';
     });
 
-    // 사진 추가 버튼 클릭 시 파일 선택 창 열기
+    // 사진 추가 버튼 클릭 시 이벤트
     document.getElementById('addImageButton').addEventListener('click', function() {
         document.getElementById('fileInput').click();
     });
 
-    // 사진 삭제 버튼 클릭 시 선택 모드 토글
-    document.getElementById('deleteImageButton').addEventListener('click', function() {
-        isDeleteMode = !isDeleteMode;
-        this.textContent = isDeleteMode ? '선택 삭제' : '사진 삭제';
-
-        if (!isDeleteMode) {
-            var selectedImages = document.querySelectorAll('#imageGallery .selected');
-            var regionKey = currentRegionProperties.adm_cd;
-            selectedImages.forEach(function(img) {
-                var index = regionImages[regionKey].indexOf(img.src);
-                if (index > -1) {
-                    regionImages[regionKey].splice(index, 1);
-                }
-                img.remove();
-            });
-        }
-    });
-
-    // 이미지 업로드 및 미리보기 기능 추가
     document.getElementById('fileInput').addEventListener('change', function(event) {
         var files = event.target.files;
-        var imageGallery = document.getElementById('imageGallery');
-        var regionKey = currentRegionProperties.adm_cd;
+        if (files.length > 0) {
+            var formData = new FormData();
+            for (var i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
 
-        if (!regionImages[regionKey]) {
-            regionImages[regionKey] = [];
-        }
+            // 현재 지역 정보를 가져와서 formData에 추가
+            var regionKey = currentRegionProperties.adm_cd;
+            formData.append('regionUniqueId', regionKey);
 
-        for (var i = 0; i < files.length; i++) {
-            var file = files[i];
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                var img = document.createElement('img');
-                var imageSrc = e.target.result;
-                img.src = imageSrc;
-                img.addEventListener('click', function() {
-                    if (isDeleteMode) {
-                        img.classList.toggle('selected');
-                    } else {
-                        infoImage.src = imageSrc;
-                        // 지도에 이미지 반영
-                        var region = getRegionEntity(regionKey);
-                        if (region) {
-                            region.polygon.material = new Cesium.ImageMaterialProperty({
-                                image: imageSrc,
-                                transparent: true
-                            });
-                        }
-                    }
+            fetch('/api/images/upload', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Success:', data);
+                    data.forEach(image => {
+                        addImageToGallery(image);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
                 });
-                imageGallery.appendChild(img);
-                regionImages[regionKey].push(imageSrc);
-            };
-            reader.readAsDataURL(file);
         }
     });
+
+    function addImageToGallery(image) {
+        var imageGallery = document.getElementById('imageGallery');
+        var img = document.createElement('img');
+        img.src = image.imageUrl;
+        img.addEventListener('click', function() {
+            updatePrimaryImage(image);
+        });
+        imageGallery.appendChild(img);
+    }
+
+    // 사진 삭제 버튼 클릭 시 이벤트
+    document.getElementById('deleteImageButton').addEventListener('click', function() {
+
+    });
+
+
 </script>
+<script  src="js/script.js"></script>
 </body>
 </html>
 ```

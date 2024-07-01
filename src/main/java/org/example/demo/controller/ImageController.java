@@ -2,6 +2,7 @@ package org.example.demo.controller;
 
 import org.example.demo.image.Image;
 import org.example.demo.image.ImageDto;
+import org.example.demo.image.ImageRepository;
 import org.example.demo.member.CustomUserDetails;
 import org.example.demo.member.Member;
 import org.example.demo.service.ImageService;
@@ -9,10 +10,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -21,8 +21,9 @@ public class ImageController {
 
     private final ImageService imageService;
 
+
     @Autowired
-    public ImageController(ImageService imageService) {
+    public ImageController(ImageService imageService, ImageRepository imageRepository) {
         this.imageService = imageService;
     }
 
@@ -92,5 +93,12 @@ public class ImageController {
                 .collect(Collectors.toList());
     }
 
-
+    @PostMapping("/images/upload")
+    public ResponseEntity<List<ImageDto>> uploadImages(@RequestParam("files") MultipartFile[] files,
+                                                       @RequestParam("regionUniqueId") String regionUniqueId,
+                                                       @AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        Member member = customUserDetails.getMember();
+        List<ImageDto> uploadedImages = imageService.saveImages(files, regionUniqueId, member);
+        return ResponseEntity.ok(uploadedImages);
+    }
 }
