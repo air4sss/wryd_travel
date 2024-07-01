@@ -317,6 +317,7 @@
         images.forEach(image => {
             var img = document.createElement('img');
             img.src = image.imageUrl;
+            img.dataset.imageId = image.imageId;
             img.addEventListener('click', function() {
                 updatePrimaryImage(image);
             });
@@ -382,6 +383,7 @@
         document.getElementById('fileInput').click();
     });
 
+    // 사진 추가 로직
     document.getElementById('fileInput').addEventListener('change', function(event) {
         var files = event.target.files;
         if (files.length > 0) {
@@ -415,16 +417,88 @@
         var imageGallery = document.getElementById('imageGallery');
         var img = document.createElement('img');
         img.src = image.imageUrl;
+        img.dataset.imageId = image.imageId; // 이미지 ID를 데이터 속성으로 저장
         img.addEventListener('click', function() {
-            updatePrimaryImage(image);
+            if (isDeleteMode) {
+                img.classList.toggle('selected');
+            } else {
+                infoImage.src = image.imageUrl;
+                var region = getRegionEntity(image.regionUniqueId);
+                if (region) {
+                    region.polygon.material = new Cesium.ImageMaterialProperty({
+                        image: image.imageUrl,
+                        transparent: true
+                    });
+                }
+            }
         });
         imageGallery.appendChild(img);
     }
 
-    // 사진 삭제 버튼 클릭 시 이벤트
     document.getElementById('deleteImageButton').addEventListener('click', function() {
+        if (!isDeleteMode) {
+            // Delete mode 활성화
+            isDeleteMode = true;
+            this.textContent = '선택 삭제';
+            document.querySelectorAll('#imageGallery img').forEach(function(img) {
+                img.addEventListener('click', toggleSelectImage);
+            });
+        } else {
+            // Delete mode 비활성화 및 실제 삭제 처리
+            isDeleteMode = false;
+            this.textContent = '사진 삭제';
+            document.querySelectorAll('#imageGallery img').forEach(function(img) {
+                img.removeEventListener('click', toggleSelectImage);
+            });
 
+            var selectedImages = document.querySelectorAll('#imageGallery img.selected');
+            console.log("selected img :", selectedImages);
+            if (selectedImages.length > 0) {
+                var imageIds = [];
+                selectedImages.forEach(function(img) {
+                    var imageId = img.dataset.imageId; // 데이터 속성에서 imageId 가져오기
+                    if (imageId) {
+                        imageIds.push(imageId);
+                    }
+                });
+
+                if (confirm('정말 삭제하시겠습니까?')) {
+                    deleteImages(imageIds);
+                } else {
+                    isDeleteMode = false;
+                    this.textContent = '사진 삭제';
+                    document.querySelectorAll('#imageGallery img').forEach(function(img) {
+                        img.removeEventListener('click', toggleSelectImage);
+                        img.classList.remove("selected");
+                    });
+                }
+            }
+        }
     });
+
+    function toggleSelectImage(event) {
+        this.classList.toggle('selected');
+    }
+
+    function deleteImages(imageIds) {
+
+        fetch('/api/images/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ imageIds: imageIds })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.querySelectorAll('#imageGallery img.selected').forEach(function(img) {
+                        img.remove();
+                    });
+                    alert("삭제가 완료됐습니다.");
+                }
+            })
+    }
 
 
 </script>
