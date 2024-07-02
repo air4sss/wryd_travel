@@ -31,14 +31,10 @@ public class ImageController {
     @GetMapping("/images/{regionUniqueId}")
     public List<ImageDto> getImagesByRegion(@PathVariable String regionUniqueId, @AuthenticationPrincipal CustomUserDetails customUserDetails) {
         Member member = customUserDetails.getMember();
-        System.out.println("Received request for images in region: " + regionUniqueId);
-        System.out.println("Member: " + (member != null ? member.getEmail() : "No member found"));
+//        System.out.println("Received request for images in region: " + regionUniqueId);
+//        System.out.println("Member: " + (member != null ? member.getEmail() : "No member found"));
 
         List<Image> images = imageService.findImagesByRegionAndMember(regionUniqueId, member);
-
-        images.forEach(image -> {
-            System.out.println("Image found: " + image.getImageUrl());
-        });
 
         return images.stream()
                 .map(image -> {
@@ -46,6 +42,7 @@ public class ImageController {
                     dto.setImageId(image.getImageId());
                     dto.setRegionUniqueId(image.getRegionUniqueId());
                     dto.setImageUrl(image.getImageUrl());
+                    System.out.println("Image url : " + image.getImageUrl());
                     dto.setUploadedAt(image.getUploadedAt());
                     return dto;
                 })
