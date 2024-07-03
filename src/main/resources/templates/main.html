@@ -2,21 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Interactive Globe</title>
+    <title>WRYD TravelMap</title>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.87/Build/Cesium/Cesium.js"></script>
     <link href="https://cesium.com/downloads/cesiumjs/releases/1.87/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="/css/style.css">
 </head>
 <body>
-<div id="resetButton">다른 나라 선택하기</div>
+<div id="resetButton" class="button" style="color: black">다른 나라 선택하기</div>
 <div id="infoBox">
-    <span class="closeButton">X</span>
+    <span class="closeButton">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+            <path fill="none" d="M0 0h24v24H0z" />
+            <path fill="currentColor" d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z" />
+        </svg>
+    </span>
     <img id="infoImage" src="" alt="대표사진이 없습니다">
     <h2 id="infoTitle"></h2>
     <h3 id="infoSubtitle"></h3>
     <p id="infoDescription"></p>
-    <div class="button_list" style="display: flex">
-        <button id="addImageButton" class="button">사진 추가</button>
+    <div class="button_list" style="display: flex;">
+        <button id="addImageButton" class="button" style="margin-right: 15px;">사진 추가</button>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
         <button id="deleteImageButton" class="button simple">사진 삭제</button>
     </div>
@@ -30,26 +35,15 @@
             .then(response => response.json())
             .then(images => {
                 images.forEach(image => {
-                    addImageToMap(image);
+                    setMapImage(image);
                 });
             })
-            .catch(error => {
-                console.error("대표 사진 로드 실패 ", error);
-            });
-    }
-    function addImageToMap(image) {
-        const regionEntity = getRegionEntity(image.regionUniqueId);
-        if (regionEntity) {
-            regionEntity.polygon.material = new Cesium.ImageMaterialProperty({
-                image: image.imageUrl,
-                transparent: true
-            });
-        } else console.error("지역 코드가 유효하지 않습니다. 지역코드 :", image.regionUniqueId);
-
     }
 
     var viewer = new Cesium.Viewer('cesiumContainer', {
-        imageryProvider: false,
+        imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+            url : 'https://a.tile.openstreetmap.org/'
+        }),
         baseLayerPicker: false,
         sceneMode: Cesium.SceneMode.SCENE3D,
         animation: false,
@@ -63,8 +57,7 @@
         creditContainer: null
     });
 
-    viewer.scene.globe.baseColor = Cesium.Color.SKYBLUE;
-
+    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('deepskyblue');
     // 처음 지도 카메라 위치
     var userLocation = {
         latitude: 37.5665,
@@ -77,7 +70,6 @@
     var labelEntities = [];
     var detailHandler;
     var currentRegionProperties;
-    var regionImages = {}; // 각 지역마다 이미지 저장소
     var isDeleteMode = false;
 
     viewer.camera.setView({
@@ -97,13 +89,15 @@
                 "북한": {longitude: 127.0101, latitude: 39.8399},
                 "대한민국": {longitude: 127.9669, latitude: 36.2078},
                 "일본": {longitude: 138.2529, latitude: 36.2048},
-                "중국": {longitude: 104.1954, latitude: 35.8617}
+                "중국": {longitude: 104.1954, latitude: 35.8617},
+                "필리핀": {longitude: 122.00, latitude: 13.00},
+                "대만": {longitude: 121.00, latitude: 23.50}
             };
 
             for (var i = 0; i < entities.length; i++) {
                 var entity = entities[i];
                 entity.name = entity.properties.name;
-                entity.polygon.material = Cesium.Color.GREEN.withAlpha(0.8);
+                entity.polygon.material = Cesium.Color.fromCssColorString('#32CD32').withAlpha(0.2);
             }
 
             // 국가 이름 라벨 추가
@@ -114,7 +108,7 @@
                         position: Cesium.Cartesian3.fromDegrees(center.longitude, center.latitude),
                         label: {
                             text: countryName,
-                            font: '12pt "맑은 고딕", "Malgun Gothic", sans-serif',
+                            font: '11pt "맑은 고딕", "Malgun Gothic", sans-serif',
                             fillColor: Cesium.Color.BLACK,
                             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
                             outlineWidth: 1,
@@ -126,6 +120,12 @@
                 }
             }
         });
+    }
+    function reloadRegion() {
+        if (currentRegionProperties) {
+            const regionKey = currentRegionProperties.adm_cd;
+            loadRegionImages(regionKey);
+        }
     }
 
     var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -166,10 +166,18 @@
 
             for (var i = 0; i < entities.length; i++) {
                 var entity = entities[i];
-                entity.polygon.material = Cesium.Color.GREEN.withAlpha(0.8);
+
+                var color = Cesium.Color.fromRandom({
+                    red: 0.5,
+                    green: 0.5,
+                    blue: 0.5,
+                    alpha: 1.0
+                }).withAlpha(0.4);
+
+                entity.polygon.material = new Cesium.ColorMaterialProperty(color);
                 entity.polygon.outline = true;
-                entity.polygon.outlineColor = Cesium.Color.GRAY.withAlpha(0.8);
-                entity.polygon.outlineWidth = 1;
+                entity.polygon.outlineColor = Cesium.Color.YELLOW;
+                entity.polygon.outlineWidth = 2.0;
                 entity.name = entity.properties.adm_nm; // Change to appropriate property
             }
 
@@ -177,27 +185,28 @@
                 "South_Korea": {longitude: 127.7669, latitude: 35.9078, height: 1000000},
                 "North_Korea": {longitude: 127.5101, latitude: 40.3399, height: 1000000},
                 "Japan": {longitude: 138.2529, latitude: 36.2048, height: 1000000},
-                "China": {longitude: 104.1954, latitude: 35.8617, height: 1000000}
+                "China": {longitude: 104.1954, latitude: 35.8617, height: 1000000},
+                "Philippines": {longitude: 122.00, latitude: 13.00, height: 1000000},
+                "Taiwan": {longitude: 121.00, latitude: 23.50, height: 1000000}
             };
             try {
                 hideRegions(dataSource, countryName);
                 if (cameraPosition[countryNameToLoad]) {
                     viewer.camera.flyTo({
-                        destination: Cesium.Cartesian3.fromDegrees(cameraPosition[countryNameToLoad].longitude, cameraPosition[countryNameToLoad].latitude, cameraPosition[countryNameToLoad].height)
+                        destination: Cesium.Cartesian3.fromDegrees(cameraPosition[countryNameToLoad].longitude, cameraPosition[countryNameToLoad].latitude, cameraPosition[countryNameToLoad].height),
+                        duration: 2
                     });
                 }
                 if (detailHandler) detailHandler.destroy();
 
                 detailHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
                 detailHandler.setInputAction(function(click) {
-                    console.log("detail clicked");
                     var pickedObject = viewer.scene.pick(click.position);
-                    console.log(pickedObject);
                     if (Cesium.defined(pickedObject) && pickedObject.id) {
                         var region = pickedObject.id;
                         currentRegionProperties = region.properties;
                         showDetailInfoBox(region.properties);
-                        loadRegionImages(region.properties.adm_cd); // 추가: 세부 지역 클릭 시 이미지 로드
+                        loadRegionImages(region.properties.adm_cd);
                     }
                 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
                 addImage();
@@ -213,6 +222,7 @@
         if (countryName === 'north korea') return "North_Korea";
         if (countryName === 'japan') return "Japan";
         if (countryName === 'china') return "China";
+        if (countryName === 'philippines') return "Philippines";
     }
 
     function showInfoBox(countryName) {
@@ -254,6 +264,18 @@
                 title: '중국',
                 subtitle: '중국(중국어 간체자: 中国, 정체자: 中國, 병음: Zhōngguó 중궈, 영어: China 차이나)',
                 description: '동아시아에 위치한 지역 또는 나라를 지칭하는 말로, 오늘날에는 중국 대륙과 그 부속 도서를 이르는 말이다.'
+            },
+            "philippines": {
+                image: 'img/countries/Philippines.png',
+                title: '필리핀',
+                subtitle: '필리핀 공화국(필리핀어: Republika ng Pilipinas 레푸블리카 낭 필리피나스, 영어: Republic of the Philippines), 약칭 필리핀(필리핀어: Pilipinas 필리피나스, 영어: Philippines)',
+                description: '서태평양에 위치한 동남아시아의 섬나라이다. 북쪽의 루손 해협 건너편에는 중화민국, 서쪽의 남중국해 건너편에는 베트남이 있다. 섬으로 구성되어 있는 필리핀은, 크게 루손섬, 비사야스 제도, 민다나오섬의 세 지역으로 나뉜다. 주요 도시로는 마닐라, 다바오, 케손시티, 세부 등이 있다.'
+            },
+            "taiwan": {
+                image: 'img/countries/Taiwan.png',
+                title: '대만',
+                subtitle: '대만(중국어 정체자: 臺灣/台灣, 간체자: 台湾, 병음: Táiwān, 주음 부호: ㄊㄞˊ ㄨㄢ) 또는 타이완',
+                description: '동아시아에 있는 타이완섬을 중심으로 정의 내리는 여러 지역명을 통합해 부르는 명칭이다. 면적은 35,980 km2로 경상도 면적과 비슷하며, 시간대는 UTC+08:00이다. 별칭은 포르투갈어로 ‘아름다운 섬’이란 뜻인 포르모사(Formosa)이다.'
             }
         };
 
@@ -277,12 +299,12 @@
         var deleteImageButton = document.getElementById('deleteImageButton');
         var imageGallery = document.getElementById('imageGallery');
 
+        infoImage.style.display = 'none';
         addImageButton.style.display = 'block';
         deleteImageButton.style.display = 'block';
         imageGallery.style.display = 'block';
 
         // 상세 정보 표시
-        infoImage.src = ''; // 필요시 지역 이미지를 추가
         infoTitle.textContent = properties.adm_nm;
         infoSubtitle.textContent = properties.adm_cd;
         infoDescription.textContent = 'Sido: ' + properties.sidonm + '\nSgg: ' + properties.sggnm;
@@ -290,13 +312,17 @@
         infoBox.style.display = 'block';
     }
 
+
     function getRegionEntity(regionKey) {
-        if (!viewer.dataSources._dataSources[1]) return null;
+        if (!viewer.dataSources._dataSources[1]) return [];
         var entities = viewer.dataSources._dataSources[1].entities.values;
+        var matchingEntities = [];
         for (var i = 0; i < entities.length; i++) {
-            if (entities[i].properties.adm_cd.toString() === regionKey.toString()) return entities[i];
+            if (entities[i].properties.adm_cd.toString() === regionKey.toString()) {
+                matchingEntities.push(entities[i]);
+            }
         }
-        return null;
+        return matchingEntities;
     }
 
     function loadRegionImages(regionUniqueId) {
@@ -305,11 +331,9 @@
             .then(images => {
                 displayImagesInGallery(images);
                 setPrimaryImageOnMap(images);
-                // Primary image 설정
-                const primaryImage = images.find(image => image.isPrimary);
-                if (primaryImage) document.getElementById('infoImage').src = primaryImage.imageUrl;
             })
     }
+
     function displayImagesInGallery(images) {
         var imageGallery = document.getElementById('imageGallery');
         imageGallery.innerHTML = ''; // 기존 이미지 제거
@@ -337,9 +361,6 @@
             .then(data => {
                 setMapImage(selectedImage); // 지도에 이미지 반영
             })
-            .catch(error => {
-                console.error("Error updating primary image:", error);
-            });
     }
 
     function setPrimaryImageOnMap(images) {
@@ -350,12 +371,18 @@
 
     function setMapImage(image) {
         const regionEntity = getRegionEntity(image.regionUniqueId);
-        if (regionEntity) {
-            regionEntity.polygon.material = new Cesium.ImageMaterialProperty({
-                image: image.imageUrl,
-                transparent: true
+        if (regionEntity && regionEntity.length > 0) {
+            regionEntity.forEach(regionEntity => {
+                if (regionEntity.polygon) { // Check if the polygon property exists
+                    regionEntity.polygon.material = new Cesium.ImageMaterialProperty({
+                        image: image.imageUrl,
+                        transparent: true
+                    });
+                } else {
+                    console.error("Polygon property not found for entity with region key:", image.regionUniqueId);
+                }
             });
-        }
+        } else console.error("No matching entities found for region key:", image.regionUniqueId);
     }
 
     document.getElementById('resetButton').addEventListener('click', function() {
@@ -369,6 +396,7 @@
             detailHandler.destroy();
             detailHandler = null;
         }
+        document.getElementById('infoImage').style.display = 'block';
         document.getElementById('infoBox').style.display = 'none';
     });
 
@@ -406,6 +434,7 @@
                     data.forEach(image => {
                         addImageToGallery(image);
                     });
+                    reloadRegion();
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -419,10 +448,8 @@
         img.src = image.imageUrl;
         img.dataset.imageId = image.imageId; // 이미지 ID를 데이터 속성으로 저장
         img.addEventListener('click', function() {
-            if (isDeleteMode) {
-                img.classList.toggle('selected');
-            } else {
-                infoImage.src = image.imageUrl;
+            if (isDeleteMode) img.classList.toggle('selected');
+            else {
                 var region = getRegionEntity(image.regionUniqueId);
                 if (region) {
                     region.polygon.material = new Cesium.ImageMaterialProperty({
@@ -432,19 +459,16 @@
                 }
             }
         });
-        imageGallery.appendChild(img);
     }
 
     document.getElementById('deleteImageButton').addEventListener('click', function() {
         if (!isDeleteMode) {
-            // Delete mode 활성화
             isDeleteMode = true;
             this.textContent = '선택 삭제';
             document.querySelectorAll('#imageGallery img').forEach(function(img) {
                 img.addEventListener('click', toggleSelectImage);
             });
         } else {
-            // Delete mode 비활성화 및 실제 삭제 처리
             isDeleteMode = false;
             this.textContent = '사진 삭제';
             document.querySelectorAll('#imageGallery img').forEach(function(img) {
@@ -481,7 +505,6 @@
     }
 
     function deleteImages(imageIds) {
-
         fetch('/api/images/delete', {
             method: 'POST',
             headers: {
@@ -496,7 +519,7 @@
                         img.remove();
                     });
                     alert("삭제가 완료됐습니다.");
-                }
+                } else alert("삭제에 실패했습니다.");
             })
     }
 
@@ -505,5 +528,4 @@
 <script  src="js/script.js"></script>
 </body>
 </html>
-```
 

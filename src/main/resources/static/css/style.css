@@ -14,13 +14,29 @@ html, body, #cesiumContainer {
 #infoBox {
     display: none;
     position: absolute;
-    top: 50px;
+    top: 60px;
     left: 10px;
-    width: 300px;
+    width: 340px;
     background-color: white;
-    border: 1px solid black;
+    border-radius: 12px;
     padding: 10px;
-    z-index: 100;
+    z-index: 90;
+    overflow-y: auto;
+    max-height: 70vh;
+}
+* {
+    scrollbar-width: 0;
+}
+
+*::-webkit-scrollbar {
+    background-color: transparent;
+    width: 12px;
+}
+
+*::-webkit-scrollbar-thumb {
+    border-radius: 99px;
+    background-color: #ddd;
+    border: 4px solid #fff;
 }
 #infoBox img {
     width: 100%;
@@ -31,24 +47,35 @@ html, body, #cesiumContainer {
     top: 5px;
     right: 5px;
     cursor: pointer;
+    transition: 0.15s ease;
+    border: 0;
+    font-weight: 600;
+    border-radius: 8px;
 }
+.closeButton:hover {
+    background-color: #dfdad7;
+}
+
 #infoBox input[type="file"] {
     display: none;
 }
 #infoBox #imageGallery {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 1px;
     margin-top: 10px;
+
 }
 #infoBox #imageGallery img {
     width: 80px;
     height: 80px;
     object-fit: cover;
     cursor: pointer;
+    padding-right: 2px;
+
 }
 #infoBox #imageGallery .selected {
-    border: 2px solid red;
+    border: 1px solid red;
 }
 .cesium-credit-logo {
     display: none !important;
