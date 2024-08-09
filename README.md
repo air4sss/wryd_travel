@@ -19,7 +19,7 @@
 | **프로그래밍 언어** | <img src="https://upload.wikimedia.org/wikipedia/en/3/30/Java_programming_language_logo.svg" alt="Java" width="20"/> Java <br> <img src="https://upload.wikimedia.org/wikipedia/commons/6/6a/JavaScript-logo.png" alt="JavaScript" width="20"/> JavaScript |
 | **프레임워크** | <img src="https://spring.io/img/spring-initializr-icon.svg" alt="Spring Boot" width="20"/> Spring Boot (백엔드) <br> <img src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg" alt="React" width="20"/> React (프론트엔드) |
 | **데이터베이스** | <img src="https://upload.wikimedia.org/wikipedia/commons/0/0a/MySQL_textlogo.svg" alt="MySQL" width="20"/> MySQL                             |
-| **지도 API** | <img src="https://upload.wikimedia.org/wikipedia/commons/e/ec/Openstreetmap_logo.svg" alt="OpenStreetMap API" width="20"/> OpenStreetMap API                             |
+| **지도 API** | OpenStreetMap API                             |
 | **공공데이터**        | 국토교통부 행정구역 시군구 경계 데이터 |
 | **파일 저장**   | 서버 내 스토리지 (사진 저장) |
 | **빌드 도구**   | <img src="https://upload.wikimedia.org/wikipedia/commons/0/0d/Maven_logo.svg" alt="Maven" width="20"/> Maven                                                                                                                   |
