@@ -22,7 +22,7 @@
 | **지도 API** | OpenStreetMap API                             |
 | **공공데이터**        | 국토교통부 행정구역 시군구 경계 데이터 |
 | **파일 저장**   | 서버 내 스토리지 (사진 저장) |
-| **빌드 도구**   | <img src="https://upload.wikimedia.org/wikipedia/commons/0/0d/Maven_logo.svg" alt="Maven" width="20"/> Maven                                                                                                                   |
+| **빌드 도구**   | Maven                                                                                                                   |
 
 ## 주요 기능 & 기술
 
